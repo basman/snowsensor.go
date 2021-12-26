@@ -93,7 +93,7 @@ func (p *Proto) GetMeasurement() (float32, int64, error) {
 		return 0, 0, errors.New("unsupported sensor protocol")
 	}
 
-	if err := p.setLaser(true); err != nil {
+	if err := p.SetLaser(true); err != nil {
 		return 0, 0, fmt.Errorf("turn laser on failed: %v", err)
 	}
 
@@ -113,7 +113,7 @@ func (p *Proto) GetMeasurement() (float32, int64, error) {
 	}
 
 	for i := int32(0); i < p.cfg.Retry; i++ {
-		if err := p.setLaser(false); err != nil {
+		if err := p.SetLaser(false); err != nil {
 			glog.Warningf("turn laser off failed: %v", err)
 			time.Sleep(2 * time.Second)
 		} else {
@@ -323,7 +323,7 @@ func (p *Proto) readMessageWENG(data []byte, cmd0 *byte, cmd1 *byte, ack *byte) 
 	return length, nil
 }
 
-func (p *Proto) setLaser(on bool) error {
+func (p *Proto) SetLaser(on bool) error {
 	var cmd0, cmd1, ack byte
 	var p1 int16 = 1
 	onStr := "off"
@@ -346,7 +346,7 @@ func (p *Proto) setLaser(on bool) error {
 		}
 		return fmt.Errorf("set laser %v failed: unexpected response, cmd0=%2x ack=%2x", onStr, cmd0, ack)
 	} else {
-		return fmt.Errorf("setLaser %v failed (len=%v, error=%v)", onStr, l, err)
+		return fmt.Errorf("SetLaser %v failed (len=%v, error=%v)", onStr, l, err)
 	}
 }
 
