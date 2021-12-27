@@ -325,16 +325,16 @@ func (p *Proto) readMessageWENG(data []byte, cmd0 *byte, cmd1 *byte, ack *byte) 
 
 func (p *Proto) SetLaser(on bool) error {
 	var cmd0, cmd1, ack byte
-	var p1 int16 = 1
+	var p2 int16 = 1
 	onStr := "off"
 	if on {
-		p1 = 0
+		p2 = 0
 		onStr = "on"
 	}
 
 	glog.Infof("set laser %v", onStr)
 
-	l, err := p.writeMessageWENG([]byte{}, WENG_CMD_REQ, WENG_CMD_LASER, 0, p1, 0, 0, 0)
+	l, err := p.writeMessageWENG([]byte{}, WENG_CMD_REQ, WENG_CMD_LASER, 0, 0, p2, 0, 0)
 	if err == nil && l == 0 {
 		// no user data
 		buf := make([]byte, 256)
