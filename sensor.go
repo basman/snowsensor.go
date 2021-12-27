@@ -26,6 +26,8 @@ func main() {
 	}
 
 	switch *cmd {
+	case "info":
+		cmdInfo(cfg)
 	case "laseron":
 		cmdLaser(true, cfg)
 	case "laseroff":
@@ -37,11 +39,26 @@ func main() {
 	}
 }
 
-func cmdLaser(on bool, cfg conf.Config) {
-	pr := protocol.InitProto(protocol.P_WENGLOR, cfg)
-	if pr == nil {
-		os.Exit(1)
+func cmdInfo(cfg conf.Config) {
+	pr := mustGetProto(cfg)
+	defer pr.Close()
+
+	info, err := pr.GetInfo()
+	if err != nil {
+		glog.Exit(err)
 	}
+
+	fmt.Printf("Name:   %v\n", info.SensorName)
+	fmt.Printf("Type:   %v\n", info.SensorType)
+	fmt.Printf("Group:  %v\n", info.SensorGroup)
+	fmt.Printf("Serial: %v\n", info.SerialNumber)
+	fmt.Printf("Firmware v%v.%v.%v; week %v; year %v\n",
+		info.FirmwareMajor, info.FirmwareMinor, info.FirmwareRevision,
+		info.FirmwareCalendarWeek, info.FirmwareYear)
+}
+
+func cmdLaser(on bool, cfg conf.Config) {
+	pr := mustGetProto(cfg)
 	defer pr.Close()
 
 	err := pr.SetLaser(on)
@@ -57,10 +74,7 @@ func cmdLaser(on bool, cfg conf.Config) {
 }
 
 func cmdMeasure(cfg conf.Config) {
-	pr := protocol.InitProto(protocol.P_WENGLOR, cfg)
-	if pr == nil {
-		os.Exit(1)
-	}
+	pr := mustGetProto(cfg)
 	defer pr.Close()
 
 	height, when, err := pr.GetMeasurement()
@@ -69,4 +83,12 @@ func cmdMeasure(cfg conf.Config) {
 	}
 
 	fmt.Printf("timestamp=\"%v\" value=\"%.1f\"\n", when, height)
+}
+
+func mustGetProto(cfg conf.Config) *protocol.Proto {
+	pr := protocol.InitProto(protocol.P_WENGLOR, cfg)
+	if pr == nil {
+		os.Exit(1)
+	}
+	return pr
 }

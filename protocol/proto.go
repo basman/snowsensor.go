@@ -21,14 +21,18 @@ const (
 )
 
 const (
-	WENG_START     = '$'
-	WENG_STOP0     = '.'
-	WENG_STOP1     = ';'
-	WENG_FRAMETYP  = 0
-	WENG_CMD_REQ   = 0x0A
-	WENG_CMD_GAP   = 0x00
-	WENG_CMD_ACK   = 0x01
-	WENG_CMD_LASER = 0x09
+	WENG_START    = '$'
+	WENG_STOP0    = '.'
+	WENG_STOP1    = ';'
+	WENG_FRAMETYP = 0
+
+	WENG_CMD0_INFO = 0x00
+	WENG_CMD0_REQ  = 0x0A
+
+	WENG_CMD1_GAP      = 0x00
+	WENG_CMD1_READINFO = 0x00
+	WENG_CMD1_LASER    = 0x09
+	WENG_RESPONSE_ACK  = 0x01
 )
 
 type PROTOCOL int32
@@ -126,7 +130,7 @@ func (p *Proto) GetMeasurement() (float32, int64, error) {
 }
 
 func (p *Proto) doGetMeasurement() (int32, error) {
-	n1, err := p.writeMessageWENG([]byte{}, WENG_CMD_REQ, WENG_CMD_GAP, 0, 0, 0, 0, 0)
+	n1, err := p.writeMessageWENG([]byte{}, WENG_CMD0_REQ, WENG_CMD1_GAP, 0, 0, 0, 0, 0)
 	if err != nil {
 		return 0, err
 	}
@@ -145,7 +149,7 @@ func (p *Proto) doGetMeasurement() (int32, error) {
 
 	glog.Infof("readMessageWENG returned len=%v, cmd0=%1X, cmd1=%1X, ack=%1d", n2, cmd0, cmd1, ack)
 
-	if n2 == 36 && cmd0 == WENG_CMD_REQ && ack == 0x01 {
+	if n2 == 36 && cmd0 == WENG_CMD0_REQ && ack == WENG_RESPONSE_ACK {
 		pval := int32(binary.LittleEndian.Uint32(buf[8:]))
 
 		glog.Infof("received measurement: val=%v", pval)
@@ -323,6 +327,56 @@ func (p *Proto) readMessageWENG(data []byte, cmd0 *byte, cmd1 *byte, ack *byte) 
 	return length, nil
 }
 
+type DeviceInfo struct {
+	SerialNumber         string
+	SensorType           int16
+	SensorGroup          int16
+	FirmwareMajor        int16
+	FirmwareMinor        int16
+	FirmwareRevision     int16
+	FirmwareCalendarWeek int16
+	FirmwareYear         int16
+	SensorName           string
+}
+
+func (p *Proto) GetInfo() (*DeviceInfo, error) {
+	var cmd0, cmd1, ack byte
+
+	cmd0 = WENG_CMD0_INFO
+	cmd1 = 0
+
+	glog.Infof("get info")
+
+	l, err := p.writeMessageWENG([]byte{}, WENG_CMD0_INFO, WENG_CMD1_READINFO, 0, 0, 0, 0, 0)
+	if err == nil && l == 0 {
+		buf := make([]byte, 256)
+		n, err := p.readMessageWENG(buf, &cmd0, &cmd1, &ack)
+		if err == nil && cmd0 == WENG_CMD0_INFO && ack != 0 && n > 0 {
+			glog.Infof("received %v bytes of info data\n", n)
+			return &DeviceInfo{
+				SerialNumber:         string(buf[:12]),
+				SensorType:           peek(buf, 40-28),
+				SensorGroup:          peek(buf, 42-28),
+				FirmwareMajor:        peek(buf, 44-28),
+				FirmwareMinor:        peek(buf, 46-28),
+				FirmwareRevision:     peek(buf, 48-28),
+				FirmwareCalendarWeek: peek(buf, 50-28),
+				FirmwareYear:         peek(buf, 52-28),
+				SensorName:           string(buf[56-28 : 56+12-28]),
+			}, nil
+		} else if err != nil {
+			return nil, fmt.Errorf("GetInfo failed: %v", err)
+		}
+		return nil, fmt.Errorf("GetInfo failed: unexpected response; cmd0=%2x cmd1=%2x ack=%2x", cmd0, cmd1, ack)
+	} else {
+		return nil, fmt.Errorf("GetInfo failed (len=%v, error=%v)", l, err)
+	}
+}
+
+func peek(buf []byte, offset int) int16 {
+	return int16(binary.LittleEndian.Uint16(buf[offset : offset+2]))
+}
+
 func (p *Proto) SetLaser(on bool) error {
 	var cmd0, cmd1, ack byte
 	var p2 int16 = 1
@@ -334,12 +388,12 @@ func (p *Proto) SetLaser(on bool) error {
 
 	glog.Infof("set laser %v", onStr)
 
-	l, err := p.writeMessageWENG([]byte{}, WENG_CMD_REQ, WENG_CMD_LASER, 0, 0, p2, 0, 0)
+	l, err := p.writeMessageWENG([]byte{}, WENG_CMD0_REQ, WENG_CMD1_LASER, 0, 0, p2, 0, 0)
 	if err == nil && l == 0 {
 		// no user data
 		buf := make([]byte, 256)
 		_, err := p.readMessageWENG(buf, &cmd0, &cmd1, &ack)
-		if err == nil && cmd0 == WENG_CMD_REQ && ack != 0 {
+		if err == nil && cmd0 == WENG_CMD0_REQ && ack != 0 {
 			return nil
 		} else if err != nil {
 			return fmt.Errorf("set laser %v failed: %v", onStr, err)
