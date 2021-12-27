@@ -296,7 +296,6 @@ func (p *Proto) readMessageWENG(data []byte, cmd0 *byte, cmd1 *byte, ack *byte) 
 		}
 		length = res.length
 	case <-time.After(READ_TIMEOUT * time.Second):
-		// FIXME close connection?
 		e := fmt.Errorf("read timeout after %v seconds", READ_TIMEOUT)
 		return 0, e
 	}
@@ -353,6 +352,7 @@ func (p *Proto) GetInfo() (*DeviceInfo, error) {
 		n, err := p.readMessageWENG(buf, &cmd0, &cmd1, &ack)
 		if err == nil && cmd0 == WENG_CMD0_INFO && ack != 0 && n > 0 {
 			glog.Infof("received %v bytes of info data\n", n)
+			buf = buf[:n]
 			return &DeviceInfo{
 				SerialNumber:         string(buf[:12]),
 				SensorType:           peek(buf, 40-28),
@@ -362,7 +362,7 @@ func (p *Proto) GetInfo() (*DeviceInfo, error) {
 				FirmwareRevision:     peek(buf, 48-28),
 				FirmwareCalendarWeek: peek(buf, 50-28),
 				FirmwareYear:         peek(buf, 52-28),
-				SensorName:           string(buf[56-28 : 56+12-28]),
+				SensorName:           string(buf[56 : 56+12]),
 			}, nil
 		} else if err != nil {
 			return nil, fmt.Errorf("GetInfo failed: %v", err)
